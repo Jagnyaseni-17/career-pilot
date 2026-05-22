@@ -218,6 +218,9 @@ router.get('/linkedin/callback', asyncHandler(async (req, res) => {
 // No verifyToken here — the user is mid-authentication and has no Firebase token yet.
 // The exchange code (192-bit entropy, 60-sec TTL, single-use) is the security boundary.
 router.get('/linkedin/token', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+
   const { code } = req.query;
 
   if (!code || typeof code !== 'string') {
