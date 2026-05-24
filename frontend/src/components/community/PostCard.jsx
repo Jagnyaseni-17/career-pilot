@@ -115,7 +115,7 @@ export default function PostCard({
   };
 
   return (
-    <article className="bg-card border border-border rounded-xl hover:border-primary/30 transition-colors">
+    <article className="bg-card border border-border rounded-xl hover:border-primary/30 transition-all duration-300 shadow-sm overflow-hidden group">
       {/* Header */}
       <div className="p-4 pb-0">
         <div className="flex items-start justify-between">
@@ -165,7 +165,6 @@ export default function PostCard({
               </div>
             </div>
           </div>
-        </div>
 
         {/* Category */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -235,7 +234,7 @@ export default function PostCard({
       </div>
 
       {/* Content */}
-      <div className="px-4 py-3">
+      <div className="p-4 py-3">
         <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-2">
           {post.title}
         </h3>
@@ -266,33 +265,29 @@ export default function PostCard({
               </button>
             </>
           ) : (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              disallowedElements={['script', 'iframe', 'style']}
-              components={{
-                a: ({ node, ...props }) => (
-                  <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" />
-                ),
-              }}
-            >
-              {post.content}
-            </ReactMarkdown>
+            <>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                disallowedElements={['script', 'iframe', 'style']}
+                components={{
+                  a: ({ node, ...props }) => (
+                    <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" />
+                  ),
+                }}
+              >
+                {post.content}
+              </ReactMarkdown>
+              {shouldTruncate && (
+                <button
+                  onClick={() => setShowFullContent(false)}
+                  className="text-primary hover:text-primary/80 font-medium text-sm mt-2 block"
+                >
+                  Show less
+                </button>
+              )}
+            </>
           )}
         </div>
-
-        {/* Tags */}
-        {post.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {post.tags.map(tag => (
-              <span
-                key={tag}
-                className="px-2 py-0.5 bg-muted text-muted-foreground rounded text-xs hover:bg-muted/80 cursor-pointer"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Attachments */}
@@ -396,7 +391,6 @@ export default function PostCard({
       {/* Actions */}
       <div className="px-4 py-3 border-t border-border flex items-center justify-between">
         <div className="flex items-center gap-4">
-          {/* Like */}
           <button
             onClick={() =>
               onLike(post.id || post._id)
@@ -460,9 +454,12 @@ export default function PostCard({
           </button>
         </div>
 
-        {/* Bookmark */}
-        <button className="text-muted-foreground hover:text-primary">
-          <Bookmark className="w-5 h-5" />
+        <button
+          onClick={handleShare}
+          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          title="Share Post"
+        >
+          <Share2 className="w-4 h-4" />
         </button>
       </div>
 
