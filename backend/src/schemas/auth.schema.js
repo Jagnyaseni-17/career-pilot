@@ -36,6 +36,30 @@ export const loginSchema = z.object({
 });
 
 /**
+ * POST /api/auth/forgot-password
+ */
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string({ required_error: 'Email is required' })
+    .email('Invalid email address')
+    .transform((val) => val.toLowerCase()),
+});
+
+/**
+ * POST /api/auth/reset-password
+ */
+export const resetPasswordSchema = z.object({
+  token: z.string({ required_error: 'Reset token is required' }).min(1, 'Reset token is required'),
+  newPassword: z
+    .string({ required_error: 'New password is required' })
+    .min(8, 'Password must be at least 8 characters')
+    .regex(
+      PASSWORD_STRENGTH_PATTERN,
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+    ),
+});
+
+/**
  * PUT /api/auth/notification-preferences
  */
 export const updateNotificationPrefsSchema = z.object({

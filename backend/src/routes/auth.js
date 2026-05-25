@@ -5,9 +5,14 @@ import { verifyToken } from '../middleware/auth.js';
 import { loginProtection } from '../middleware/loginProtection.js';
 import { saveUserToFirebase } from '../services/firebaseDataService.js';
 import { validate } from '../middleware/validate.js';
-import { updateNotificationPrefsSchema } from '../schemas/auth.schema.js';
-
-import { registerSchema, loginSchema } from '../validators/authValidator.js';
+import {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  updateNotificationPrefsSchema,
+} from '../schemas/auth.schema.js';
+import { sendPasswordResetEmail } from '../services/mailService.js';
 import { exchangeCodeForToken, getLinkedInAuthUrl, getLinkedInProfile } from '../services/linkedinService.js';
 import User from '../models/User.model.js';
 import admin from '../config/firebase.js';
@@ -15,7 +20,8 @@ import crypto from 'crypto';
 
 const router = express.Router();
 const stateStore = new Map();
-const tokenStore = new Map(); // one-time token exchange store
+const tokenStore = new Map();       // one-time LinkedIn token exchange store
+const passwordResetStore = new Map(); // one-time password reset token store (1h TTL)
 
 router.post('/register', validate(registerSchema), asyncHandler(async (req, res) => {
   const { email, name, password } = req.body;
@@ -52,29 +58,32 @@ router.post('/login', loginProtection, validate(loginSchema), asyncHandler(async
 
   if (!user || !user.password) rejectWithUniform();
 
-  const passwordMatches = await user.comparePassword(password);
-  if (!passwordMatches) rejectWithUniform();
-
+  // Check the reset flag BEFORE calling bcrypt.compare. Accounts flagged by the
+  // migration script may still have a plaintext value stored; passing that to
+  // bcrypt.compare throws "Invalid salt" (a 500) instead of the expected 403.
   if (user.requiresPasswordReset) {
     return res.status(403).json({
       success: false,
-      error: 'A password reset is required before you can log in. Please check your email for reset instructions.',
+      error: 'A password reset is required before you can log in. Use the forgot-password flow to set a new password.',
       requiresPasswordReset: true,
     });
   }
 
-  // Create or retrieve the Firebase user so we can issue a custom token
-  // that the frontend can exchange for a Firebase ID token.
+  const passwordMatches = await user.comparePassword(password);
+  if (!passwordMatches) rejectWithUniform();
+
+  // Only catch the specific "user not found" code — any other Firebase error
+  // (network, permissions, quota) should surface as a 500 so it is visible.
   let firebaseUid;
   try {
     const firebaseUser = await admin.auth().getUserByEmail(email);
     firebaseUid = firebaseUser.uid;
-  } catch {
-    const firebaseUser = await admin.auth().createUser({
-      email,
-      displayName: user.username,
-    });
-    firebaseUid = firebaseUser.uid;
+  } catch (firebaseErr) {
+    if (firebaseErr?.code !== 'auth/user-not-found') {
+      throw new ApiError(500, 'Authentication service error. Please try again.');
+    }
+    const newFirebaseUser = await admin.auth().createUser({ email, displayName: user.username });
+    firebaseUid = newFirebaseUser.uid;
   }
 
   const customToken = await admin.auth().createCustomToken(firebaseUid);
@@ -87,18 +96,65 @@ router.post('/login', loginProtection, validate(loginSchema), asyncHandler(async
   });
 }));
 
+// Always returns 200 regardless of whether the email exists, to prevent enumeration.
+router.post('/forgot-password', validate(forgotPasswordSchema), asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+
+  if (user) {
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    passwordResetStore.set(resetToken, {
+      userId: user._id.toString(),
+      expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+    sendPasswordResetEmail({ email, resetLink }).catch((err) =>
+      console.error('Failed to send password reset email:', err.message)
+    );
+  }
+
+  res.json({
+    success: true,
+    message: 'If an account with that email exists, a password reset link has been sent.',
+  });
+}));
+
+router.post('/reset-password', validate(resetPasswordSchema), asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  const entry = passwordResetStore.get(token);
+  if (!entry || Date.now() > entry.expiresAt) {
+    passwordResetStore.delete(token);
+    throw new ApiError(400, 'Reset token is invalid or has expired. Please request a new one.');
+  }
+
+  passwordResetStore.delete(token);
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  await User.updateOne(
+    { _id: entry.userId },
+    { $set: { password: passwordHash, requiresPasswordReset: false } }
+  );
+
+  res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
+}));
+
 // Periodic sweep of expired store entries every 10 minutes to prevent memory leaks
 setInterval(() => {
   const now = Date.now();
   for (const [state, expiry] of stateStore.entries()) {
-    if (now > expiry) {
-      stateStore.delete(state);
-    }
+    if (now > expiry) stateStore.delete(state);
   }
   for (const [code, entry] of tokenStore.entries()) {
-    if (now > entry.expiresAt) {
-      tokenStore.delete(code);
-    }
+    if (now > entry.expiresAt) tokenStore.delete(code);
+  }
+  for (const [token, entry] of passwordResetStore.entries()) {
+    if (now > entry.expiresAt) passwordResetStore.delete(token);
   }
 }, 10 * 60 * 1000).unref();
 
@@ -180,7 +236,6 @@ router.get('/linkedin/callback', asyncHandler(async (req, res) => {
 
   const storedExpiry = stateStore.get(state);
   if (!storedExpiry || Date.now() > storedExpiry) {
-
     stateStore.delete(state);
     return res.redirect(`${frontendUrl}/login?error=linkedin_invalid_state`);
   }
@@ -218,34 +273,30 @@ router.get('/linkedin/callback', asyncHandler(async (req, res) => {
 
     try {
       const firebaseUser = await admin.auth().getUserByEmail(email);
-      firebaseUid = firebaseUser.uid
-    } catch {
-      const newFirebaseUser = await admin.auth().createUser({
-        email,
-        displayName: name,
-        photoURL: picture
-      })
-
+      firebaseUid = firebaseUser.uid;
+    } catch (firebaseErr) {
+      if (firebaseErr?.code !== 'auth/user-not-found') {
+        return res.redirect(`${frontendUrl}/login?error=linkedin_auth_failed`);
+      }
+      const newFirebaseUser = await admin.auth().createUser({ email, displayName: name, photoURL: picture });
       firebaseUid = newFirebaseUser.uid;
     }
   } else {
-    let firebaseUser;
     try {
-      firebaseUser = await admin.auth().getUserByEmail(email);
-    } catch {
-      firebaseUser = await admin.auth().createUser({ email, displayName: name, photoURL: picture })
+      const firebaseUser = await admin.auth().getUserByEmail(email);
+      firebaseUid = firebaseUser.uid;
+    } catch (firebaseErr) {
+      if (firebaseErr?.code !== 'auth/user-not-found') {
+        return res.redirect(`${frontendUrl}/login?error=linkedin_auth_failed`);
+      }
+      const firebaseUser = await admin.auth().createUser({ email, displayName: name, photoURL: picture });
+      firebaseUid = firebaseUser.uid;
     }
-    firebaseUid = firebaseUser.uid;
 
-    await admin.auth().setCustomUserClaims(firebaseUid, {
-      linkedinId,
-      pendingOnboarding: true,
-    })
+    await admin.auth().setCustomUserClaims(firebaseUid, { linkedinId, pendingOnboarding: true });
   }
 
-  const customToken = await admin.auth().createCustomToken(firebaseUid, {
-    linkedinId
-  });
+  const customToken = await admin.auth().createCustomToken(firebaseUid, { linkedinId });
 
   // Store token in one-time exchange store (60s TTL) instead of passing in URL
   const exchangeCode = crypto.randomBytes(16).toString('hex');

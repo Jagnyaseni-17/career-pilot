@@ -15,7 +15,13 @@ import assert from 'node:assert/strict';
 import { z } from 'zod';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
-import { updateNotificationPrefsSchema, registerSchema, loginSchema } from '../auth.schema.js';
+import {
+  updateNotificationPrefsSchema,
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from '../auth.schema.js';
 
 describe('auth.schema — updateNotificationPrefsSchema', () => {
   test('accepts valid boolean prefs', () => {
@@ -44,7 +50,7 @@ describe('auth.schema — updateNotificationPrefsSchema', () => {
 });
 
 describe('auth.schema — registerSchema', () => {
-  const valid = { name: 'Alice Example', email: 'alice@example.com', password: 'Secret1pass' };
+  const valid = { name: 'Alice Example', email: 'alice@example.com', password: 'Passw0rdTest' };
 
   test('accepts a fully valid registration body', () => {
     const result = registerSchema.safeParse(valid);
@@ -162,6 +168,69 @@ describe('auth.schema — loginSchema', () => {
     const result = loginSchema.safeParse({});
     assert.ok(!result.success);
     assert.equal(result.error.issues.length, 2);
+  });
+});
+
+describe('auth.schema — forgotPasswordSchema', () => {
+  test('accepts a valid email', () => {
+    const result = forgotPasswordSchema.safeParse({ email: 'user@example.com' });
+    assert.ok(result.success, JSON.stringify(result.error?.issues));
+  });
+
+  test('normalises email to lowercase', () => {
+    const result = forgotPasswordSchema.safeParse({ email: 'USER@EXAMPLE.COM' });
+    assert.ok(result.success);
+    assert.equal(result.data.email, 'user@example.com');
+  });
+
+  test('rejects an invalid email', () => {
+    const result = forgotPasswordSchema.safeParse({ email: 'not-an-email' });
+    assert.ok(!result.success);
+    assert.ok(result.error.issues.some((e) => e.path[0] === 'email'));
+  });
+
+  test('rejects a missing email', () => {
+    const result = forgotPasswordSchema.safeParse({});
+    assert.ok(!result.success);
+    assert.ok(result.error.issues.some((e) => e.path[0] === 'email'));
+  });
+});
+
+describe('auth.schema — resetPasswordSchema', () => {
+  const valid = { token: 'a'.repeat(64), newPassword: 'Passw0rdTest' };
+
+  test('accepts a valid reset payload', () => {
+    const result = resetPasswordSchema.safeParse(valid);
+    assert.ok(result.success, JSON.stringify(result.error?.issues));
+  });
+
+  test('rejects a missing token', () => {
+    const result = resetPasswordSchema.safeParse({ newPassword: 'Passw0rdTest' });
+    assert.ok(!result.success);
+    assert.ok(result.error.issues.some((e) => e.path[0] === 'token'));
+  });
+
+  test('rejects a password shorter than 8 characters', () => {
+    const result = resetPasswordSchema.safeParse({ ...valid, newPassword: 'Ab1' });
+    assert.ok(!result.success);
+    assert.ok(result.error.issues.some((e) => e.path[0] === 'newPassword'));
+  });
+
+  test('rejects a password with no uppercase letter', () => {
+    const result = resetPasswordSchema.safeParse({ ...valid, newPassword: 'lowercase1' });
+    assert.ok(!result.success);
+    assert.ok(result.error.issues.some((e) => e.path[0] === 'newPassword'));
+  });
+
+  test('rejects a password with no digit', () => {
+    const result = resetPasswordSchema.safeParse({ ...valid, newPassword: 'NoDigitsHere' });
+    assert.ok(!result.success);
+    assert.ok(result.error.issues.some((e) => e.path[0] === 'newPassword'));
+  });
+
+  test('rejects an empty body', () => {
+    const result = resetPasswordSchema.safeParse({});
+    assert.ok(!result.success);
   });
 });
 
