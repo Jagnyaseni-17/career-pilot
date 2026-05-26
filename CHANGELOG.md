@@ -1,3 +1,15 @@
+# [1.15.0](https://github.com/anurag3407/career-pilot/compare/v1.14.1...v1.15.0) (2026-05-26)
+
+
+### Bug Fixes
+
+* remove unnecessary line from Projects component ([c119f70](https://github.com/anurag3407/career-pilot/commit/c119f703f6873bacb5d16443d6443219277de102))
+
+
+### Features
+
+* implement Origami Paper projects section ([5178ea2](https://github.com/anurag3407/career-pilot/commit/5178ea2018acf587a38dec93e218c8fb0f0ad2c0))
+
 ## [1.14.1](https://github.com/anurag3407/career-pilot/compare/v1.14.0...v1.14.1) (2026-05-26)
 
 
