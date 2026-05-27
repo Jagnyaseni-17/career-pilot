@@ -1,3 +1,10 @@
+# [1.49.0](https://github.com/anurag3407/career-pilot/compare/v1.48.0...v1.49.0) (2026-05-27)
+
+
+### Features
+
+* **portfolio:** add SocialLinksEditor component ([47ab761](https://github.com/anurag3407/career-pilot/commit/47ab761206a623e9aca912c5dddd8f4fe599f340))
+
 # [1.48.0](https://github.com/anurag3407/career-pilot/compare/v1.47.0...v1.48.0) (2026-05-27)
 
 
