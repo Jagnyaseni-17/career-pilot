@@ -482,7 +482,6 @@ function Skills() {
 // ─── PROJECTS ────────────────────────────────────────────────────────────────
 function Projects() {
   const projects = arr(safe(data, "projects"));
-  const [active, setActive] = useState(null);
 
   return (
     <Section id="projects" className="py-24 px-6">
