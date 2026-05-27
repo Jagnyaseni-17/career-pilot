@@ -1,3 +1,17 @@
+# [1.50.0](https://github.com/anurag3407/career-pilot/compare/v1.49.0...v1.50.0) (2026-05-27)
+
+
+### Bug Fixes
+
+* address CodeRabbit AI suggestions and improve data fallbacks ([517bf53](https://github.com/anurag3407/career-pilot/commit/517bf539cb95c4f062c9100b9f9073e2317ce6f2))
+* scope select-none to sidebars to allow text copying ([f1ffc48](https://github.com/anurag3407/career-pilot/commit/f1ffc48543a00797129137402a0b4ab3c9968698))
+
+
+### Features
+
+* add Discord Server portfolio template ([9c394ac](https://github.com/anurag3407/career-pilot/commit/9c394acc538ac16e6cb8902e030cb84d63b840cd))
+* **portfolio:** implement watercolor artistic hero section ([e482ea4](https://github.com/anurag3407/career-pilot/commit/e482ea4764a6faad04372ef6acde12d41cd82fb5))
+
 # [1.49.0](https://github.com/anurag3407/career-pilot/compare/v1.48.0...v1.49.0) (2026-05-27)
 
 
