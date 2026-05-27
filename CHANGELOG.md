@@ -1,3 +1,10 @@
+# [1.47.0](https://github.com/anurag3407/career-pilot/compare/v1.46.1...v1.47.0) (2026-05-27)
+
+
+### Features
+
+* add SaaS Product portfolio template ([#1961](https://github.com/anurag3407/career-pilot/issues/1961)) ([12f5c8f](https://github.com/anurag3407/career-pilot/commit/12f5c8f035c8e9eff4a4f42f197a7c30fb07b162))
+
 ## [1.46.1](https://github.com/anurag3407/career-pilot/compare/v1.46.0...v1.46.1) (2026-05-27)
 
 
