@@ -311,6 +311,9 @@ router.put('/:slug', verifyToken, validatePortfolioSlug, validatePortfolioConten
   });
 }));
  /* g. POST /api/portfolio/:id/save
+
+/**
+ * g. POST /api/portfolio/:id/save
  */
 router.post('/:id/save', verifyToken, asyncHandler(async (req, res) => {
   const { id } = req.params;

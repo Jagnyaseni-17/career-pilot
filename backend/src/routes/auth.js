@@ -160,15 +160,6 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000).unref();
 
-// Sweep expired linkedInTokenStore entries every 60 seconds
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, { expiresAt }] of linkedInTokenStore.entries()) {
-    if (now > expiresAt) {
-      linkedInTokenStore.delete(code);
-    }
-  }
-}, 60 * 1000).unref();
 
 
 // Verify token endpoint — loginProtection tracks failed attempts per IP
@@ -310,12 +301,6 @@ router.get('/linkedin/callback', asyncHandler(async (req, res) => {
 
   const customToken = await admin.auth().createCustomToken(firebaseUid, { linkedinId });
 
-  const exchangeCode = crypto.randomBytes(24).toString('hex');
-  linkedInTokenStore.set(exchangeCode, {
-    token: customToken,
-    isNew: !mongoUser,
-    expiresAt: Date.now() + 60 * 1000,
-  });
   // Store token in one-time exchange store (60s TTL) instead of passing in URL
   const newExchangeCode = crypto.randomBytes(16).toString('hex');
   tokenStore.set(newExchangeCode, { token: customToken, isNew: !mongoUser, expiresAt: Date.now() + 60000 });
